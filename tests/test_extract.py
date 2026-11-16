@@ -1,0 +1,57 @@
+from collections import Counter
+
+import pytest_asyncio
+from playwright.async_api import async_playwright
+
+from engine.config import load_config
+from engine.extract.links import extract_links
+from engine.load.page_loader import load_page
+
+CFG = load_config()
+
+
+@pytest_asyncio.fixture(scope="module")
+async def links(server):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        status = await load_page(page, server + "/fixtures/links_page.html", CFG)
+        assert status == 200
+        yield await extract_links(page, CFG)
+        await browser.close()
+
+
+def by_text(links, text):
+    return next(l for l in links if l.text == text)
+
+
+async def test_extracts_all_links_with_regions(links):
+    assert Counter(l.region for l in links) == {"header": 1, "footer": 1, "main": 9}
+
+
+async def test_raw_href_preserved_vs_resolved(links, server):
+    l = by_text(links, "Working link")
+    assert l.raw_href == "/ok"
+    assert l.abs_url == server + "/ok"
+    assert l.selector == "#cta-ok"
+
+
+async def test_hidden_tab_link_extracted_and_marked_invisible(links):
+    l = by_text(links, "Hidden tab resource")
+    assert l.visible is False
+    assert by_text(links, "Working link").visible is True
+
+
+async def test_image_link_text_falls_back_to_alt(links):
+    assert any(l.text == "Logo" for l in links)
+
+
+async def test_kinds_assigned(links):
+    assert by_text(links, "Empty href").kind == "empty"
+    assert by_text(links, "Email us").kind == "mailto"
+    assert by_text(links, "Working link").kind == "internal"
+
+
+async def test_bbox_present_for_visible_links(links):
+    box = by_text(links, "Working link").bbox
+    assert box and box["width"] > 0
