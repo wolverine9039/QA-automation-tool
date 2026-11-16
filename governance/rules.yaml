@@ -17,3 +17,12 @@ link_check:
   max_redirects: 10
   concurrency: 8         # links checked at the same time
   per_host_concurrency: 4
+
+# Severity (critical | major | minor | info) and status (issue = must fix, review = check by hand) per rule.
+rules:
+  L01: {name: Broken link, severity: critical, status: issue}
+  L02: {name: Could not verify, severity: info, status: review}
+  L03: {name: Permanent redirect, severity: minor, status: issue}
+  L04: {name: Temporary redirect, severity: info, status: issue}
+  L05: {name: Redirect chain, severity: major, status: issue}
+  L09: {name: Empty link, severity: major, status: issue}
