@@ -1,0 +1,19 @@
+# QA tool rules. Edit values here; changes apply on the next run.
+
+link_check:
+  # Hosts treated as "internal" (relative links are always internal).
+  internal_hosts: [www.opentext.com, opentext.com]
+  # Links whose path ends with one of these extensions count as "resource" links.
+  resource_extensions: [pdf, doc, docx, xls, xlsx, ppt, pptx, zip, csv, mp4]
+  # HTTP statuses reported as broken. All 5xx are broken too.
+  # 490 is what www.opentext.com returns for "Page Not Found".
+  broken_statuses: [404, 410, 490]
+  # Statuses that usually mean "blocked for automated checks", not broken. Check these manually.
+  unverifiable_statuses: [401, 403, 429, 999]
+  # Text in a response body that means a bot-protection challenge page, not the real page.
+  bot_protection_markers: ["Incapsula", "_Incapsula_Resource", "cf-chl", "Attention Required"]
+  timeout_ms: 15000      # per request
+  retries: 1             # extra attempts after a timeout or connection error
+  max_redirects: 10
+  concurrency: 8         # links checked at the same time
+  per_host_concurrency: 4
