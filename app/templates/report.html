@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}QA report{% if ticket_id %} - {{ ticket_id }}{% endif %}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="report-head">
+    <div>
+      <h1>Link QA report{% if ticket_id %} &middot; {{ ticket_id }}{% endif %}</h1>
+      <p class="muted"><a href="{{ r.final_url }}" target="_blank" rel="noopener">{{ r.final_url }}</a>
+        &middot; page HTTP {{ r.page_status }} &middot; {{ r.duration_s }}s &middot; {{ r.started_at }}
+        &middot; scope: {{ "whole page" if r.include_global else "page content (header & footer excluded)" }}</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/runs/{{ run_id }}/findings.csv">Export findings (CSV)</a>
+      <a class="btn ghost" href="/runs/{{ run_id }}/links.csv">Export all links (CSV)</a>
+      <a class="btn ghost" href="/">New check</a>
+    </div>
+  </div>
+  {% set inv = r.inventory %}
+  <div class="counters">
+    <div class="counter"><b>{{ inv.total }}</b>Total links</div>
+    <div class="counter"><b>{{ inv.internal }}</b>Internal</div>
+    <div class="counter"><b>{{ inv.external }}</b>External</div>
+    <div class="counter"><b>{{ inv.resource }}</b>Resource</div>
+    <div class="counter"><b>{{ inv.other }}</b>Other<small>mailto, tel, anchors, empty</small></div>
+    <div class="counter bad"><b>{{ inv.broken }}</b>Broken</div>
+    <div class="counter warn"><b>{{ inv.redirected }}</b>Redirected</div>
+    <div class="counter info"><b>{{ inv.unverifiable }}</b>Check manually</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Findings <span class="pill">{{ r.findings|length }}</span></h2>
+  {% if not r.findings %}
+    <p class="ok-msg">No broken links, redirects or empty links found.</p>
+  {% else %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Severity</th><th>Rule</th><th>Finding</th><th>Link text</th><th>Link (as authored)</th><th>Suggestion</th><th>Where</th></tr></thead>
+    <tbody>
+    {% for f in r.findings %}
+      <tr class="sev-{{ f.severity }}">
+        <td><span class="badge {{ f.severity }}">{{ f.severity }}</span>{% if f.status == "review" %}<span class="badge review">review</span>{% endif %}</td>
+        <td>{{ f.rule_id }}<br><small class="muted">{{ f.category }}</small></td>
+        <td>{{ f.message }}</td>
+        <td>{{ f.element_text or "(no text)" }}</td>
+        <td class="url">{{ f.raw_value or "(empty)" }}</td>
+        <td class="url">{{ f.suggestion }}</td>
+        <td><small>{{ f.region }}</small></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>All links found <span class="pill">{{ link_rows|length }}</span></h2>
+  <p class="muted">Every link the tool pulled from the page, so you can confirm nothing was missed. "Hidden" links sit in closed tabs or accordions.</p>
+  <div class="table-wrap"><table class="compact">
+    <thead><tr><th>Result</th><th>HTTP</th><th>Kind</th><th>Text</th><th>Link (as authored)</th><th>Opens in</th><th>Visible</th><th>Region</th></tr></thead>
+    <tbody>
+    {% for l, res in link_rows %}
+      <tr>
+        <td>
+          {% if not res %}<span class="outcome skipped">not checked</span>
+          {% elif res.outcome == "ok" and res.chain %}<span class="outcome redirected">redirect</span>
+          {% else %}<span class="outcome {{ res.outcome }}">{{ "check manually" if res.outcome == "unverifiable" else res.outcome }}</span>{% endif %}
+        </td>
+        <td>{{ res.status if res and res.status else "" }}</td>
+        <td>{{ l.kind }}</td>
+        <td>{{ l.text or "(no text)" }}</td>
+        <td class="url">{{ l.raw_href or "(empty)" }}</td>
+        <td>{{ "new tab" if l.target == "_blank" else "same tab" }}</td>
+        <td>{{ "yes" if l.visible else "hidden" }}</td>
+        <td><small>{{ l.region }}</small></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

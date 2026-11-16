@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OpenText QA Tool{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand">QA Tool <span>OpenText pages</span></a>
+    <nav aria-label="QA areas">
+      <a href="/" class="active">Link QA</a>
+      <span class="soon" title="Coming in a later release">Content QA</span>
+      <span class="soon" title="Coming in a later release">Accessibility QA</span>
+      <span class="soon" title="Coming in a later release">Media QA</span>
+      <span class="soon" title="Coming in a later release">Template QA</span>
+    </nav>
+  </header>
+  <main class="wrap">{% block content %}{% endblock %}</main>
+</body>
+</html>

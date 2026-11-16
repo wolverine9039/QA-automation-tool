@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card form-card">
+  <h1>Check a page</h1>
+  <p class="muted">Loads the page in a real browser, finds every link (including links in hidden tabs) and checks each one for broken pages and redirects.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/run" id="run-form">
+    <label for="ticket_id">Ticket ID <span class="muted">(optional)</span></label>
+    <input id="ticket_id" name="ticket_id" value="{{ ticket_id or '' }}" placeholder="e.g. WEB-1234">
+    <label for="url">Page URL</label>
+    <input id="url" name="url" type="url" required value="{{ url or '' }}" placeholder="https://www.opentext.com/products/...">
+    <label class="check"><input type="checkbox" name="include_global" value="true" {% if include_global %}checked{% endif %}> Include header &amp; footer links <span class="muted">(about 500 more links; slower)</span></label>
+    <button type="submit">Run check</button>
+  </form>
+</section>
+<script>
+  document.getElementById("run-form").addEventListener("submit", function () {
+    var b = this.querySelector("button");
+    b.disabled = true;
+    b.textContent = "Checking links... this can take a minute";
+  });
+</script>
+{% endblock %}
