@@ -1,3 +1,6 @@
+import copy
+import time
+
 import pytest
 import pytest_asyncio
 from playwright.async_api import async_playwright
@@ -88,3 +91,38 @@ async def test_duplicate_urls_checked_once(server, request_ctx, test_cfg):
 async def test_malformed_bot_response_is_unverifiable(request_ctx, test_cfg, malformed_http_url):
     r = await check_one(request_ctx, malformed_http_url, test_cfg)
     assert r.outcome == "unverifiable"
+
+
+async def test_cloudflare_challenge_header_on_5xx_is_unverifiable(server, request_ctx, test_cfg):
+    r = await check_one(request_ctx, server + "/cf503", test_cfg)
+    assert r.outcome == "unverifiable"
+
+
+async def test_waf_block_body_on_5xx_is_unverifiable(server, request_ctx, test_cfg):
+    r = await check_one(request_ctx, server + "/waf503", test_cfg)
+    assert r.outcome == "unverifiable"
+
+
+async def test_get_fallback_uses_range_so_big_files_are_not_timeouts(server, request_ctx, test_cfg):
+    r = await check_one(request_ctx, server + "/bigfile", test_cfg)
+    assert (r.outcome, r.status) == ("ok", 206)
+
+
+class Timed:
+    """Wraps the real request context and records when each URL's fetch finished."""
+    def __init__(self, ctx):
+        self.ctx, self.done, self.t0 = ctx, {}, time.monotonic()
+
+    async def fetch(self, url, **kw):
+        resp = await self.ctx.fetch(url, **kw)
+        self.done[url] = time.monotonic() - self.t0
+        return resp
+
+
+async def test_slow_host_does_not_hold_global_slots(server, other_server, request_ctx, test_cfg):
+    cfg = copy.deepcopy(test_cfg)
+    cfg["link_check"].update(concurrency=2, per_host_concurrency=1)
+    timed = Timed(request_ctx)
+    fast = other_server + "/ok"
+    await check_urls(timed, [server + "/slow?a=1", server + "/slow?a=2", fast], cfg)
+    assert timed.done[fast] < 0.8   # must not wait behind the slow host's 1 s timeouts

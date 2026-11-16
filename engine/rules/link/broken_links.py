@@ -53,12 +53,14 @@ def _from_result(link: LinkRecord, res: CheckResult, cfg: dict) -> Finding | Non
 
 
 def _suggested_target(link: LinkRecord, res: CheckResult) -> str:
-    """Keep relative internal links relative, per the authoring standard."""
+    """Keep relative links relative (authoring standard), unless the redirect leaves this host."""
     authored = urlparse(link.raw_href)
-    if link.kind in ("internal", "resource") and not authored.scheme and not authored.netloc:
-        final = urlparse(res.final_url)
-        return final.path + (f"?{final.query}" if final.query else "")
-    return res.final_url
+    final = urlparse(res.final_url)
+    fragment = f"#{authored.fragment}" if authored.fragment and not final.fragment else ""
+    same_host = final.netloc == urlparse(link.abs_url).netloc
+    if same_host and not authored.scheme and not authored.netloc:
+        return final.path + (f"?{final.query}" if final.query else "") + fragment
+    return res.final_url + fragment
 
 
 def _finding(rule_id, link, cfg, category, message, suggestion, res: CheckResult | None = None) -> Finding:

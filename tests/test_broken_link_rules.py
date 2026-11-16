@@ -123,3 +123,16 @@ def test_placeholder_with_role_button_is_not_L09():
 
 def test_empty_href_with_role_button_is_still_L09():
     assert rule_ids(evaluate([link("", "empty", abs_url=SITE + "/", role="button")], {}, CFG)) == ["L09"]
+
+
+def test_redirect_to_other_host_suggests_absolute_url():
+    l = link("/support", "internal")
+    r = result(l.abs_url, "ok", 200, chain=[(l.abs_url, 301)], final="https://support.opentext.com/")
+    assert evaluate([l], {SITE + "/support": r}, CFG)[0].suggestion == "https://support.opentext.com/"
+
+
+def test_relative_suggestion_keeps_authored_fragment():
+    l = link("/old#pricing", "internal")
+    key = SITE + "/old"
+    r = result(key, "ok", 200, chain=[(key, 301)], final=SITE + "/new")
+    assert evaluate([l], {key: r}, CFG)[0].suggestion == "/new#pricing"

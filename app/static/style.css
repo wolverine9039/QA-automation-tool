@@ -26,6 +26,7 @@ button, .btn { display:inline-block; margin-top:20px; padding:10px 18px; backgro
 button:disabled { opacity:.65; cursor:wait; }
 .btn.ghost { background:#fff; color:var(--accent); border:1px solid var(--accent); }
 .error { background:#fdecec; color:var(--crit); padding:10px 12px; border-radius:6px; }
+.warning { background:#fff4e5; color:#7a3e00; border:1px solid #f0c48a; padding:10px 12px; border-radius:6px; margin:14px 0 0; }
 .report-head { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
 .actions { display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; }
 .actions .btn { margin-top:0; }

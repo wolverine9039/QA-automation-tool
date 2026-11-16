@@ -15,8 +15,12 @@ _EXTRACT_JS = r"""() => {
     }
     return parts.join(' > ');
   };
-  const region = a => a.closest('header,[role=banner]') ? 'header'
-                    : a.closest('footer,[role=contentinfo]') ? 'footer' : 'main';
+  // HTML rule: <header>/<footer> are the page banner/footer only when not inside sectioning content;
+  // a card or section header (e.g. inside <article>) is page content.
+  const SECTIONING = 'main,article,aside,nav,section';
+  const isGlobal = (a, tag) => { const el = a.closest(tag); return !!el && !el.parentElement.closest(SECTIONING); };
+  const region = a => (a.closest('[role=banner]') || isGlobal(a, 'header')) ? 'header'
+                    : (a.closest('[role=contentinfo]') || isGlobal(a, 'footer')) ? 'footer' : 'main';
   const clean = s => (s || '').replace(/\s+/g, ' ').trim();
   return [...document.querySelectorAll('a[href]')].map(a => {
     const img = a.querySelector('img[alt]');

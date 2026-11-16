@@ -18,18 +18,19 @@ async def test_run_main_scope(fixture_url, test_cfg):
     result = await run(fixture_url, cfg=test_cfg)
     assert result.page_status == 200
     assert {l.region for l in result.links} == {"main"}
-    assert result.inventory["total"] == 10
+    assert result.inventory["total"] == 12
     ids = Counter(f.rule_id for f in result.findings)
     assert ids == {"L01": 2, "L03": 1, "L09": 2}
     broken = {f.raw_value for f in result.findings if f.rule_id == "L01"}
     assert broken == {"/missing", "/gone"}
     # most serious first
     assert result.findings[0].severity == "critical"
+    assert result.warnings == []
 
 
 async def test_run_include_global_adds_header_footer(fixture_url, test_cfg):
     result = await run(fixture_url, include_global=True, cfg=test_cfg)
-    assert result.inventory["total"] == 12
+    assert result.inventory["total"] == 14
     assert Counter(f.rule_id for f in result.findings)["L01"] == 3
 
 
@@ -51,3 +52,20 @@ def test_csv_neutralises_formula_cells():
                            started_at="t", duration_s=0, links=[], results={}, findings=[f], inventory={})
     rows = list(csv.reader(io.StringIO(findings_csv(run_result))))
     assert rows[1][6].startswith("'=")
+
+
+async def test_page_that_did_not_load_warns(server, test_cfg):
+    result = await run(server + "/missing", cfg=test_cfg)
+    text = " ".join(result.warnings)
+    assert "HTTP 404" in text
+    assert "No links" in text
+
+
+async def test_challenge_page_warns(server, test_cfg):
+    result = await run(server + "/challenge", cfg=test_cfg)
+    assert any("bot-protection" in w for w in result.warnings)
+
+
+async def test_page_redirect_warns(server, test_cfg):
+    result = await run(server + "/r301", cfg=test_cfg)
+    assert any("redirected to" in w and w.rstrip(".").endswith("/ok") for w in result.warnings)

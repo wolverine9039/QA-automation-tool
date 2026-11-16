@@ -1,0 +1,10 @@
+<!doctype html><html><body>
+<div id="feed"></div>
+<script>
+  // Every scroll adds more height, like an endless feed.
+  const feed = document.getElementById('feed');
+  const add = () => { const d = document.createElement('div'); d.style.height = '2000px'; feed.appendChild(d); };
+  add();
+  window.addEventListener('scroll', add);
+</script>
+</body></html>

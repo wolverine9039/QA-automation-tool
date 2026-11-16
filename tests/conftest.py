@@ -56,6 +56,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(405)
             return self._send(200, b"<html><script src='/_Incapsula_Resource?x=1'></script></html>",
                               {"Content-Type": "text/html"})
+        if path == "/cf503":  # Cloudflare-style challenge: marked by header, generic body
+            return self._send(503, b"<html>please wait</html>", {"cf-mitigated": "challenge"})
+        if path == "/waf503":  # WAF block page served as 5xx
+            return self._send(503, b"<html><script src='/_Incapsula_Resource?x=1'></script></html>")
+        if path == "/bigfile":  # HEAD refused; a full GET is slow (big file), a ranged GET is fast
+            if self.command == "HEAD":
+                return self._send(405)
+            if self.headers.get("Range"):
+                return self._send(206, b"x" * 1024)
+            time.sleep(3)
+            return self._send(200, b"x" * 1024)
         if path.startswith("/fixtures/"):
             f = FIXTURES / path.removeprefix("/fixtures/")
             if f.is_file():
@@ -72,6 +83,16 @@ def server():
     httpd.daemon_threads = True
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
     t.start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    httpd.shutdown()
+
+
+@pytest.fixture(scope="session")
+def other_server():
+    """A second host (different port) so per-host limits can be tested."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    httpd.daemon_threads = True
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}"
     httpd.shutdown()
 

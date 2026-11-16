@@ -28,6 +28,7 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
             page = await context.new_page()
             page_status = await load_page(page, url, cfg)
             final_url = page.url
+            page_html = await page.content()
             links = await extract_links(page, cfg)
             if not include_global:
                 links = [l for l in links if l.region == "main"]
@@ -41,7 +42,22 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
         url=url, final_url=final_url, page_status=page_status, include_global=include_global,
         started_at=started_at, duration_s=round(time.monotonic() - started, 1),
         links=links, results=results, findings=findings, inventory=summarize(links, results),
+        warnings=page_warnings(url, final_url, page_status, page_html, links, cfg),
     )
+
+
+def page_warnings(url, final_url, page_status, page_html, links, cfg) -> list[str]:
+    """Reasons an empty or clean report may not mean the real page is clean."""
+    warnings = []
+    if page_status and page_status >= 400:
+        warnings.append(f"The page itself returned HTTP {page_status}, so this is probably not the page you meant to check.")
+    if any(m in page_html for m in cfg["link_check"]["bot_protection_markers"]):
+        warnings.append("The page looks like a bot-protection challenge, not the real page. Check it by hand.")
+    if url.rstrip("/") != final_url.rstrip("/"):
+        warnings.append(f"The page redirected to {final_url}.")
+    if not links:
+        warnings.append("No links were found in the page content. The page may not have loaded correctly.")
+    return warnings
 
 
 def run_sync(url: str, include_global: bool = False, cfg: dict | None = None) -> RunResult:

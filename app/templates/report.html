@@ -15,6 +15,7 @@
       <a class="btn ghost" href="/">New check</a>
     </div>
   </div>
+  {% for w in r.warnings %}<p class="warning" role="alert">&#9888; {{ w }}</p>{% endfor %}
   {% set inv = r.inventory %}
   <div class="counters">
     <div class="counter"><b>{{ inv.total }}</b>Total links</div>
@@ -30,7 +31,9 @@
 
 <section class="card">
   <h2>Findings <span class="pill">{{ r.findings|length }}</span></h2>
-  {% if not r.findings %}
+  {% if not r.findings and r.warnings %}
+    <p class="muted">No findings, but see the warning above: the check may not have covered the real page.</p>
+  {% elif not r.findings %}
     <p class="ok-msg">No broken links, redirects or empty links found.</p>
   {% else %}
   <div class="table-wrap"><table>

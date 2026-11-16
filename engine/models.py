@@ -63,3 +63,4 @@ class RunResult(_Dict):
     results: dict[str, CheckResult]
     findings: list[Finding]
     inventory: dict
+    warnings: list[str] = field(default_factory=list)   # reasons the results may not reflect the real page

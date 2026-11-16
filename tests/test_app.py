@@ -47,3 +47,10 @@ def test_link_text_is_html_escaped(server):
 
 def test_unknown_run_404():
     assert client.get("/runs/does-not-exist").status_code == 404
+
+
+def test_report_shows_warning_instead_of_all_clear(server):
+    r = client.post("/run", data={"url": server + "/missing"}, follow_redirects=True)
+    assert r.status_code == 200
+    assert "HTTP 404" in r.text
+    assert "No broken links" not in r.text

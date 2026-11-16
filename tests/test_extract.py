@@ -26,7 +26,7 @@ def by_text(links, text):
 
 
 async def test_extracts_all_links_with_regions(links):
-    assert Counter(l.region for l in links) == {"header": 1, "footer": 1, "main": 10}
+    assert Counter(l.region for l in links) == {"header": 1, "footer": 1, "main": 12}
 
 
 async def test_raw_href_preserved_vs_resolved(links, server):
@@ -59,3 +59,17 @@ async def test_bbox_present_for_visible_links(links):
 
 async def test_role_captured(links):
     assert by_text(links, "close").role == "button"
+
+
+async def test_section_header_and_footer_links_count_as_main(links):
+    assert by_text(links, "Card header link").region == "main"
+    assert by_text(links, "Card footer link").region == "main"
+
+
+async def test_infinite_scroll_page_still_finishes(server):
+    import asyncio
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await asyncio.wait_for(load_page(page, server + "/fixtures/infinite_scroll.html", CFG), timeout=40)
+        await browser.close()

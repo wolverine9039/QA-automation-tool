@@ -16,6 +16,8 @@ def main(argv=None) -> int:
 
     result = run_sync(args.url, args.include_global)
     print(f"Page: {result.final_url} (HTTP {result.page_status}), {result.duration_s}s")
+    for w in result.warnings:
+        print(f"WARNING: {w}")
     print("Inventory: " + ", ".join(f"{k}={v}" for k, v in result.inventory.items()))
     for f in result.findings:
         print(f"[{f.severity:8}] {f.rule_id} {f.message} | {f.element_text!r} -> {f.raw_value}"
