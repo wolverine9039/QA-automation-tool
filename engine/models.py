@@ -19,6 +19,7 @@ class LinkRecord(_Dict):
     selector: str
     bbox: dict | None
     kind: str = ""         # see engine.links.classify
+    role: str = ""         # ARIA role; "button" means a JS control styled as a link
 
 
 @dataclass

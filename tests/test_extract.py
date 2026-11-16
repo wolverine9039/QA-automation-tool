@@ -26,7 +26,7 @@ def by_text(links, text):
 
 
 async def test_extracts_all_links_with_regions(links):
-    assert Counter(l.region for l in links) == {"header": 1, "footer": 1, "main": 9}
+    assert Counter(l.region for l in links) == {"header": 1, "footer": 1, "main": 10}
 
 
 async def test_raw_href_preserved_vs_resolved(links, server):
@@ -55,3 +55,7 @@ async def test_kinds_assigned(links):
 async def test_bbox_present_for_visible_links(links):
     box = by_text(links, "Working link").bbox
     assert box and box["width"] > 0
+
+
+async def test_role_captured(links):
+    assert by_text(links, "close").role == "button"

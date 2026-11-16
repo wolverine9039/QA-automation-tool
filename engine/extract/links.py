@@ -29,6 +29,7 @@ _EXTRACT_JS = r"""() => {
             || clean(img && img.getAttribute('alt')),
       target: a.getAttribute('target') || '',
       rel: a.getAttribute('rel') || '',
+      role: a.getAttribute('role') || '',
       region: region(a),
       visible: rects.length > 0,
       selector: cssPath(a),

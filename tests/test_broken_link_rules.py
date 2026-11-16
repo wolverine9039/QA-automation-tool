@@ -7,9 +7,9 @@ CFG = load_config()
 SITE = "https://www.opentext.com"
 
 
-def link(raw, kind, abs_url=None, text="Link"):
+def link(raw, kind, abs_url=None, text="Link", role=""):
     return LinkRecord(raw_href=raw, abs_url=abs_url or SITE + raw, text=text, target="", rel="",
-                      region="main", visible=True, selector="a", bbox=None, kind=kind)
+                      region="main", visible=True, selector="a", bbox=None, kind=kind, role=role)
 
 
 def result(url, outcome, status, chain=(), final=None, error=None):
@@ -113,3 +113,13 @@ def test_summarize_counts():
         "total": 7, "internal": 2, "external": 2, "resource": 1, "other": 2,
         "broken": 1, "redirected": 1, "unverifiable": 1,
     }
+
+
+def test_placeholder_with_role_button_is_not_L09():
+    # e.g. modal close controls: <a href="#" role="button" aria-label="close">
+    assert evaluate([link("#", "empty", abs_url=SITE + "/#", role="button")], {}, CFG) == []
+    assert evaluate([link("javascript:void(0)", "empty", abs_url="javascript:void(0)", role="button")], {}, CFG) == []
+
+
+def test_empty_href_with_role_button_is_still_L09():
+    assert rule_ids(evaluate([link("", "empty", abs_url=SITE + "/", role="button")], {}, CFG)) == ["L09"]

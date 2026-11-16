@@ -11,6 +11,8 @@ def evaluate(links: list[LinkRecord], results: dict[str, CheckResult], cfg: dict
     findings = []
     for link in links:
         if link.kind == "empty":
+            if link.role == "button" and link.raw_href.strip():
+                continue  # "#" / javascript: on role=button is a JS control (e.g. modal close), not a link
             findings.append(_finding("L09", link, cfg, "Broken Link", "Empty or placeholder link",
                                      "Add the destination URL, or remove the link."))
             continue

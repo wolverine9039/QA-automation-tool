@@ -18,7 +18,7 @@ async def test_run_main_scope(fixture_url, test_cfg):
     result = await run(fixture_url, cfg=test_cfg)
     assert result.page_status == 200
     assert {l.region for l in result.links} == {"main"}
-    assert result.inventory["total"] == 9
+    assert result.inventory["total"] == 10
     ids = Counter(f.rule_id for f in result.findings)
     assert ids == {"L01": 2, "L03": 1, "L09": 2}
     broken = {f.raw_value for f in result.findings if f.rule_id == "L01"}
@@ -29,7 +29,7 @@ async def test_run_main_scope(fixture_url, test_cfg):
 
 async def test_run_include_global_adds_header_footer(fixture_url, test_cfg):
     result = await run(fixture_url, include_global=True, cfg=test_cfg)
-    assert result.inventory["total"] == 11
+    assert result.inventory["total"] == 12
     assert Counter(f.rule_id for f in result.findings)["L01"] == 3
 
 
