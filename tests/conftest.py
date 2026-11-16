@@ -52,6 +52,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(405)
             return self._send(200, b"ok")
         if path == "/challenge":
+            if self.command == "HEAD":
+                return self._send(405)
             return self._send(200, b"<html><script src='/_Incapsula_Resource?x=1'></script></html>",
                               {"Content-Type": "text/html"})
         if path.startswith("/fixtures/"):
@@ -89,3 +91,25 @@ def test_cfg():
     cfg = copy.deepcopy(load_config())
     cfg["link_check"].update(timeout_ms=1000, retries=0)
     return cfg
+
+
+@pytest.fixture(scope="session")
+def malformed_http_url():
+    """Mimics Imperva's bot response: data after `Connection: close`, which HTTP clients reject."""
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(16)
+
+    def serve():
+        while True:
+            try:
+                conn, _ = srv.accept()
+            except OSError:
+                return
+            with conn:
+                conn.recv(4096)
+                conn.sendall(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nokEXTRA-DATA")
+
+    threading.Thread(target=serve, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.getsockname()[1]}/"
+    srv.close()
