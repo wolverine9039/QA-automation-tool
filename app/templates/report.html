@@ -6,7 +6,7 @@
     <div>
       <h1>Link QA report{% if ticket_id %} &middot; {{ ticket_id }}{% endif %}</h1>
       <p class="muted"><a href="{{ r.final_url }}" target="_blank" rel="noopener">{{ r.final_url }}</a>
-        &middot; page HTTP {{ r.page_status }} &middot; {{ r.duration_s }}s &middot; {{ r.started_at }}
+        &middot; page HTTP {{ r.page_status }} &middot; {{ r.duration_s }}s &middot; {{ r.started_at|local_time }}
         &middot; scope: {{ "whole page" if r.include_global else "page content (header & footer excluded)" }}</p>
     </div>
     <div class="actions">
@@ -23,11 +23,47 @@
     <div class="counter"><b>{{ inv.external }}</b>External</div>
     <div class="counter"><b>{{ inv.resource }}</b>Resource</div>
     <div class="counter"><b>{{ inv.other }}</b>Other<small>mailto, tel, anchors, empty</small></div>
-    <div class="counter bad"><b>{{ inv.broken }}</b>Broken</div>
+    <div class="counter bad"><b>{{ inv.broken }}</b>Broken{% if inv.unverifiable %}<small>{{ inv.unverifiable }} still to check</small>{% endif %}</div>
     <div class="counter warn"><b>{{ inv.redirected }}</b>Redirected</div>
-    <div class="counter info"><b>{{ inv.unverifiable }}</b>Check manually</div>
+    <div class="counter info"><b>{{ inv.unverifiable }}</b>Still to check by hand</div>
   </div>
 </section>
+
+{% if review_rows %}
+<section class="card review" id="review">
+  {% set left = r.inventory.unverifiable %}
+  <h2>{% if left %}{{ left }} link{{ "s" if left != 1 }} need a human check{% else %}Human check done{% endif %}</h2>
+  <p class="muted">These sites block automated checks (bot protection), so the tool cannot tell if they work.
+    Open each one, then mark it. The counts and exports update straight away.</p>
+  <div class="table-wrap"><table class="compact">
+    <thead><tr><th>Link text</th><th>Link</th><th>Status</th><th>Mark as</th></tr></thead>
+    <tbody>
+    {% for url, (text, res) in review_rows.items() %}
+      <tr>
+        <td>{{ text or "(no text)" }}</td>
+        <td class="url">{{ url }}</td>
+        <td>
+          {% if res.checked_by == "reviewer" %}
+            <span class="outcome {{ res.outcome }}">{{ "works" if res.outcome == "ok" else "broken" }}</span><br><small class="muted">marked by reviewer</small>
+          {% else %}<span class="outcome unverifiable">not checked yet</span>{% endif %}
+        </td>
+        <td class="review-actions">
+          <a class="btn small ghost" href="{{ url }}" target="_blank" rel="noopener noreferrer">Open link</a>
+          {% for verdict, label in [("ok", "Works ✓"), ("broken", "Broken ✗"), ("reset", "Undo")] %}
+            {% if verdict != "reset" or res.checked_by == "reviewer" %}
+            <form method="post" action="/runs/{{ run_id }}/review">
+              <input type="hidden" name="url" value="{{ url }}">
+              <button class="small {{ verdict }}" name="verdict" value="{{ verdict }}">{{ label }}</button>
+            </form>
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
 
 <section class="card">
   <h2>Findings <span class="pill">{{ r.findings|length }}</span></h2>

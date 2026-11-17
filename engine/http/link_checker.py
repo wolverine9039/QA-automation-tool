@@ -1,5 +1,6 @@
 """Checks each unique URL over HTTP, following redirects by hand so the full chain is visible."""
 import asyncio
+import os
 from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import Error as PlaywrightError
@@ -8,6 +9,7 @@ from engine.models import CheckResult
 
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 BODY_SNIFF_BYTES = 65536
+TOKEN_ENV = "QA_TOOL_ALLOWLIST_TOKEN"   # the secret stays out of rules.yaml (which is committed)
 
 
 async def check_urls(request_ctx, urls: list[str], cfg: dict) -> dict[str, CheckResult]:
@@ -89,7 +91,17 @@ def _challenged(resp) -> bool:
     return resp.headers.get("cf-mitigated", "").lower() == "challenge"  # Cloudflare's challenge marker
 
 
+def _allowlist_header(url: str, lc: dict) -> dict:
+    """The header OpenText's WAF lets through, sent only to its own hosts so the token never leaks elsewhere."""
+    name, token = lc.get("allowlist_header"), os.environ.get(TOKEN_ENV)
+    host = urlparse(url).hostname or ""
+    if name and token and any(host == h or host.endswith("." + h) for h in lc.get("allowlist_hosts", [])):
+        return {name: token}
+    return {}
+
+
 async def _request(ctx, url: str, method: str, lc: dict, headers: dict | None = None):
+    headers = {**(headers or {}), **_allowlist_header(url, lc)} or None
     attempts = lc["retries"] + 1
     for attempt in range(attempts):
         try:

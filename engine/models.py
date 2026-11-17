@@ -30,6 +30,7 @@ class CheckResult(_Dict):
     final_url: str
     chain: list = field(default_factory=list)   # [[url, status], ...] redirect hops before final
     error: str | None = None
+    checked_by: str = "tool"   # "reviewer" once a person has marked a link the tool could not check
 
 
 @dataclass

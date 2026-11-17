@@ -59,3 +59,10 @@ tr.sev-critical { background:#fff5f5; }
 .outcome.redirected { color:var(--major); }
 .outcome.skipped { color:var(--muted); font-weight:400; }
 .ok-msg { color:var(--ok); font-weight:600; }
+.card.review { border-left:4px solid var(--info); }
+.review-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.review-actions form { margin:0; }
+button.small, .btn.small { margin-top:0; padding:4px 10px; font-size:13px; }
+button.ok { background:var(--ok); }
+button.broken { background:var(--crit); }
+button.reset { background:#fff; color:var(--muted); border:1px solid var(--line); }

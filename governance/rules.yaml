@@ -17,6 +17,11 @@ link_check:
   max_redirects: 10
   concurrency: 8         # links checked at the same time
   per_host_concurrency: 4
+  # Bot protection (Cloudflare/Imperva) blocks automated checks on some OpenText sites.
+  # Once OpenText's web team allowlists a request header for this tool, put the header NAME here
+  # and set its secret VALUE in the QA_TOOL_ALLOWLIST_TOKEN environment variable (never in this file).
+  allowlist_header: ""          # e.g. X-OT-QA-Tool
+  allowlist_hosts: [opentext.com]   # the header is only sent to these hosts and their subdomains
 
 # Severity (critical | major | minor | info) and status (issue = must fix, review = check by hand) per rule.
 rules:

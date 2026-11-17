@@ -37,11 +37,11 @@ async def test_run_include_global_adds_header_footer(fixture_url, test_cfg):
 async def test_csv_exports_have_headers_and_rows(fixture_url, test_cfg):
     result = await run(fixture_url, cfg=test_cfg)
     rows = list(csv.reader(io.StringIO(findings_csv(result))))
-    assert rows[0][:3] == ["Severity", "Status", "Rule"]
-    assert len(rows) == 1 + len(result.findings)
+    header = next(i for i, r in enumerate(rows) if r and r[0] == "Severity")
+    assert len(rows) - header - 1 == len(result.findings)
     links = list(csv.reader(io.StringIO(links_csv(result))))
-    assert links[0][0] == "Region"
-    assert len(links) == 1 + len(result.links)
+    header = next(i for i, r in enumerate(links) if r and r[0] == "Section")
+    assert len(links) - header - 1 == len(result.links)
 
 
 def test_csv_neutralises_formula_cells():
@@ -51,7 +51,8 @@ def test_csv_neutralises_formula_cells():
     run_result = RunResult(url="u", final_url="u", page_status=200, include_global=False,
                            started_at="t", duration_s=0, links=[], results={}, findings=[f], inventory={})
     rows = list(csv.reader(io.StringIO(findings_csv(run_result))))
-    assert rows[1][6].startswith("'=")
+    data = rows[next(i for i, r in enumerate(rows) if r and r[0] == "Severity") + 1]
+    assert data[3].startswith("'=")   # Link text column
 
 
 async def test_page_that_did_not_load_warns(server, test_cfg):

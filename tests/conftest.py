@@ -51,6 +51,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == "HEAD":
                 return self._send(405)
             return self._send(200, b"ok")
+        if path == "/needs-header":  # behaves like a WAF that only lets the allowlisted QA tool through
+            return self._send(200 if self.headers.get("X-QA-Test") == "secret" else 403)
         if path == "/challenge":
             if self.command == "HEAD":
                 return self._send(405)

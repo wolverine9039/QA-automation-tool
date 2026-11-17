@@ -37,13 +37,43 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
             results = await check_urls(context.request, to_check, cfg)
         finally:
             await browser.close()
-    findings = sorted(evaluate(links, results, cfg), key=lambda f: SEVERITY_ORDER.get(f.severity, 9))
-    return RunResult(
+    result = RunResult(
         url=url, final_url=final_url, page_status=page_status, include_global=include_global,
         started_at=started_at, duration_s=round(time.monotonic() - started, 1),
-        links=links, results=results, findings=findings, inventory=summarize(links, results),
+        links=links, results=results, findings=[], inventory={},
         warnings=page_warnings(url, final_url, page_status, page_html, links, cfg),
     )
+    _refresh(result, cfg)
+    return result
+
+
+def _refresh(result: RunResult, cfg: dict) -> None:
+    result.findings = sorted(evaluate(result.links, result.results, cfg),
+                             key=lambda f: SEVERITY_ORDER.get(f.severity, 9))
+    result.inventory = summarize(result.links, result.results)
+
+
+VERDICTS = {"ok", "broken", "reset"}
+
+
+def apply_review(result: RunResult, url: str | None, verdict: str | None, cfg: dict) -> None:
+    """Record a person's verdict on a link the tool could not check, then recompute findings and counts.
+
+    With url=None only the recompute happens. Raises ValueError for anything that is not a reviewable link.
+    """
+    if url is not None:
+        res = result.results.get(url)
+        if verdict not in VERDICTS:
+            raise ValueError(f"Unknown verdict: {verdict!r}")
+        if res is None or not (res.outcome == "unverifiable" or res.checked_by == "reviewer"):
+            raise ValueError("Only links the tool could not check can be reviewed")
+        res.status = None  # the blocked response's status says nothing about the real page
+        if verdict == "reset":
+            res.outcome, res.checked_by, res.error = "unverifiable", "tool", None
+        else:
+            res.outcome, res.checked_by = verdict, "reviewer"
+            res.error = "Marked broken by reviewer" if verdict == "broken" else None
+    _refresh(result, cfg)
 
 
 def page_warnings(url, final_url, page_status, page_html, links, cfg) -> list[str]:

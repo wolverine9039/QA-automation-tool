@@ -15,6 +15,23 @@ Roadmap and architecture: [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md)
    - **All links found:** every link the tool pulled, so you can confirm nothing was missed.
 5. **Export findings (CSV)** or **Export all links (CSV)** to attach to the ticket.
 
+### Links that need a human check
+Some sites block automated checks with bot protection (for example community.opentext.com behind Imperva, and blogs.opentext.com behind Cloudflare). The tool can't tell whether those links work, so the report lists them under **"N links need a human check"**:
+
+1. Click **Open link** to open the link in your browser.
+2. Mark it **Works ✓** or **Broken ✗**.
+
+The counters, findings, and exports update immediately. **Undo** puts a link back on the list. Until every link is marked, the Broken counter also shows "N still to check", so 0 broken is never mistaken for "all clear".
+
+**Making these checks automatic.** Ask OpenText's web team to allowlist a request header for this tool in Cloudflare and Imperva (for example `X-OT-QA-Tool: <secret>`). Then:
+- put the header **name** in `governance/rules.yaml` → `allowlist_header`;
+- set the secret **value** in the `QA_TOOL_ALLOWLIST_TOKEN` environment variable. Never put it in the file.
+
+The header is only sent to the hosts in `allowlist_hosts` (OpenText domains), so the secret never reaches other sites.
+
+### Exports
+**Export findings (CSV)** starts with a short summary (ticket, page, date, totals, warnings), followed by one row per issue. The columns are: Severity, Action (Fix / Check by hand / Review), Issue, Link text, Link on page, Suggested fix, HTTP status, Redirect path (one hop per line), Checked by (Tool / Reviewer), Section, Rule. **Export all links (CSV)** lists every link with a readable result: Working, Broken, Redirect, Check by hand, or Not checked.
+
 By default only the page content is checked. Tick **Include header & footer links** to check the global navigation too (about 500 more links).
 
 ### What the findings mean
