@@ -8,7 +8,7 @@ SITE = "https://www.opentext.com"
 
 
 def link(raw, kind, abs_url=None, text="Link", role=""):
-    return LinkRecord(raw_href=raw, abs_url=abs_url or SITE + raw, text=text, target="", rel="",
+    return LinkRecord(raw_href=raw, abs_url=abs_url or SITE + raw, text=text, target="",
                       region="main", visible=True, selector="a", bbox=None, kind=kind, role=role)
 
 
@@ -31,7 +31,7 @@ def test_broken_is_L01_critical():
     l = link("/gone", "internal")
     f = evaluate([l], {l.abs_url: result(l.abs_url, "broken", 490)}, CFG)
     assert rule_ids(f) == ["L01"]
-    assert (f[0].severity, f[0].status, f[0].http_status) == ("critical", "issue", 490)
+    assert (f[0].severity, f[0].status) == ("critical", "issue")
     assert "490" in f[0].message
 
 
@@ -97,7 +97,7 @@ def test_mailto_not_checked_no_findings():
 
 def test_summarize_counts():
     links = [
-        link("/ok", "internal"), link("/r", "internal"), link("/x.pdf", "resource"),
+        link("/ok", "internal"), link("/r", "internal"), link("/rb", "internal"), link("/x.pdf", "resource"),
         link("https://ext.com/", "external", abs_url="https://ext.com/"),
         link("https://blocked.com/", "external", abs_url="https://blocked.com/"),
         link("mailto:a@b.com", "mailto", abs_url="mailto:a@b.com"), link("", "empty", abs_url=SITE + "/"),
@@ -105,13 +105,14 @@ def test_summarize_counts():
     results = {
         SITE + "/ok": result(SITE + "/ok", "ok", 200),
         SITE + "/r": result(SITE + "/r", "ok", 200, chain=[(SITE + "/r", 301)]),
+        SITE + "/rb": result(SITE + "/rb", "broken", 404, chain=[(SITE + "/rb", 301)]),   # broken, not redirected
         SITE + "/x.pdf": result(SITE + "/x.pdf", "broken", 404),
         "https://ext.com/": result("https://ext.com/", "ok", 200),
         "https://blocked.com/": result("https://blocked.com/", "unverifiable", 403),
     }
     assert summarize(links, results) == {
-        "total": 7, "internal": 2, "external": 2, "resource": 1, "other": 2,
-        "broken": 1, "redirected": 1, "unverifiable": 1,
+        "total": 8, "internal": 3, "external": 2, "resource": 1, "other": 2,
+        "broken": 2, "redirected": 1, "unverifiable": 1,
     }
 
 
@@ -136,3 +137,9 @@ def test_relative_suggestion_keeps_authored_fragment():
     key = SITE + "/old"
     r = result(key, "ok", 200, chain=[(key, 301)], final=SITE + "/new")
     assert evaluate([l], {key: r}, CFG)[0].suggestion == "/new#pricing"
+
+
+def test_redirect_to_bare_homepage_suggests_slash():
+    l = link("/old-product", "internal")
+    r = result(l.abs_url, "ok", 200, chain=[(l.abs_url, 301)], final=SITE)
+    assert evaluate([l], {l.abs_url: r}, CFG)[0].suggestion == "/"

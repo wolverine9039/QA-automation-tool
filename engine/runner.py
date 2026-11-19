@@ -1,18 +1,19 @@
-"""One QA run: load the page, extract links, check them, apply rules, summarise."""
+"""One QA run: load the page, extract links and embeds, check them, apply rules, summarise."""
 import asyncio
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright
 
 from engine.config import load_config
-from engine.extract.links import extract_links
+from engine.extract.links import extract_embeds, extract_links
 from engine.http.link_checker import check_urls
 from engine.inventory import summarize
 from engine.links.classify import CHECKABLE, check_key
 from engine.load.page_loader import load_page
 from engine.models import RunResult
-from engine.rules.link.broken_links import evaluate
+from engine.rules.link import broken_links, governance
 
 SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2, "info": 3}
 
@@ -30,8 +31,10 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
             final_url = page.url
             page_html = await page.content()
             links = await extract_links(page, cfg)
+            embeds = await extract_embeds(page)
             if not include_global:
                 links = [l for l in links if l.region == "main"]
+                embeds = [e for e in embeds if e.region == "main"]
             to_check = [check_key(l.abs_url) for l in links if l.kind in CHECKABLE]
             # context.request shares the page's cookies, which keeps WAFs from blocking every check
             results = await check_urls(context.request, to_check, cfg)
@@ -40,7 +43,7 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
     result = RunResult(
         url=url, final_url=final_url, page_status=page_status, include_global=include_global,
         started_at=started_at, duration_s=round(time.monotonic() - started, 1),
-        links=links, results=results, findings=[], inventory={},
+        links=links, results=results, findings=[], inventory={}, embeds=embeds,
         warnings=page_warnings(url, final_url, page_status, page_html, links, cfg),
     )
     _refresh(result, cfg)
@@ -48,9 +51,15 @@ async def run(url: str, include_global: bool = False, cfg: dict | None = None) -
 
 
 def _refresh(result: RunResult, cfg: dict) -> None:
-    result.findings = sorted(evaluate(result.links, result.results, cfg),
-                             key=lambda f: SEVERITY_ORDER.get(f.severity, 9))
-    result.inventory = summarize(result.links, result.results)
+    lc, page_host = cfg["link_check"], urlparse(result.final_url).hostname or ""
+    if page_host not in lc["internal_hosts"]:
+        # A relative path only works on the page's own host: on blogs.opentext.com, "/x" is not www.opentext.com/x.
+        cfg = {**cfg, "link_check": {**lc, "internal_hosts": [page_host]}}
+    findings = (broken_links.evaluate(result.links, result.results, cfg)
+                + governance.evaluate(result.links, result.embeds, cfg))
+    result.findings = sorted(findings, key=lambda f: SEVERITY_ORDER.get(f.severity, 9))
+    result.inventory = summarize(result.links, result.results) | {
+        "legacy": governance.legacy_count(result.links + result.embeds, cfg)}
 
 
 VERDICTS = {"ok", "broken", "reset"}

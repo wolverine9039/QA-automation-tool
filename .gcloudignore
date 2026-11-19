@@ -1,0 +1,20 @@
+# Files NOT uploaded by `gcloud run deploy --source .` (without this file gcloud would fall back to .gitignore).
+# input/ holds client documents: never upload it.
+.gcloudignore
+.dockerignore
+/.git/
+.gitignore
+/.venv/
+/input/
+/data/
+/tests/
+/docs/
+/deploy/
+/.claude/
+/.remember/
+/.superpowers/
+/.pytest_cache/
+*.egg-info/
+**/__pycache__/
+start.bat
+README.md

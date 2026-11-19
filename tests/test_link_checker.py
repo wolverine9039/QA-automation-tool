@@ -47,7 +47,12 @@ async def test_chain_with_relative_location(server, request_ctx, test_cfg):
 
 async def test_redirect_loop_is_broken(server, request_ctx, test_cfg):
     r = await check_one(request_ctx, server + "/loop1", test_cfg)
-    assert (r.outcome, r.error) == ("broken", "Redirect loop")
+    assert (r.outcome, r.error) == ("broken", f"More than {test_cfg['link_check']['max_redirects']} redirects")
+
+
+async def test_redirect_to_self_to_set_cookie_is_ok(server, request_ctx, test_cfg):
+    r = await check_one(request_ctx, server + "/cookie-check", test_cfg)
+    assert (r.outcome, r.status, len(r.chain)) == ("ok", 200, 1)
 
 
 async def test_redirect_to_404_is_broken(server, request_ctx, test_cfg):

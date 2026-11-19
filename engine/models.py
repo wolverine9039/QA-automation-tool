@@ -1,29 +1,23 @@
 """Data shapes shared by every layer: extraction, checks, rules, report."""
-from dataclasses import asdict, dataclass, field
-
-
-class _Dict:
-    def to_dict(self) -> dict:
-        return asdict(self)
+from dataclasses import dataclass, field
 
 
 @dataclass
-class LinkRecord(_Dict):
+class LinkRecord:
     raw_href: str          # exactly as authored (getAttribute), not browser-resolved
     abs_url: str           # resolved against the page URL
     text: str
     target: str
-    rel: str
     region: str            # header | main | footer
     visible: bool
     selector: str
     bbox: dict | None
-    kind: str = ""         # see engine.links.classify
+    kind: str = ""         # see engine.links.classify; "embed" for media/iframe/script sources
     role: str = ""         # ARIA role; "button" means a JS control styled as a link
 
 
 @dataclass
-class CheckResult(_Dict):
+class CheckResult:
     url: str
     outcome: str           # ok | broken | unverifiable
     status: int | None
@@ -34,7 +28,7 @@ class CheckResult(_Dict):
 
 
 @dataclass
-class Finding(_Dict):
+class Finding:
     rule_id: str
     category: str
     severity: str          # critical | major | minor | info
@@ -47,13 +41,12 @@ class Finding(_Dict):
     selector: str
     region: str
     bbox: dict | None
-    http_status: int | None = None
     chain: list = field(default_factory=list)
     area: str = "Link QA"
 
 
 @dataclass
-class RunResult(_Dict):
+class RunResult:
     url: str
     final_url: str
     page_status: int | None
@@ -65,3 +58,4 @@ class RunResult(_Dict):
     findings: list[Finding]
     inventory: dict
     warnings: list[str] = field(default_factory=list)   # reasons the results may not reflect the real page
+    embeds: list[LinkRecord] = field(default_factory=list)   # iframe/script/video/... sources, kind "embed"

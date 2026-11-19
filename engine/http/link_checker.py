@@ -30,7 +30,6 @@ async def check_urls(request_ctx, urls: list[str], cfg: dict) -> dict[str, Check
 
 async def _check(ctx, url: str, lc: dict) -> CheckResult:
     chain: list = []
-    seen = {url}
     current = url
     for _ in range(lc["max_redirects"] + 1):
         try:
@@ -43,12 +42,9 @@ async def _check(ctx, url: str, lc: dict) -> CheckResult:
         if challenged or any(m in body for m in lc["bot_protection_markers"]):
             return CheckResult(url, "unverifiable", status, current, chain, "Bot-protection challenge page")
         if status in REDIRECT_STATUSES and location:
+            # No "seen this URL" check: sites redirect to the same URL to set a cookie; max_redirects catches real loops.
             chain.append([current, status])
-            nxt = urljoin(current, location)
-            if nxt in seen:
-                return CheckResult(url, "broken", status, nxt, chain, "Redirect loop")
-            seen.add(nxt)
-            current = nxt
+            current = urljoin(current, location)
             continue
         return CheckResult(url, _outcome(status, lc), status, current, chain)
     return CheckResult(url, "broken", None, current, chain, f"More than {lc['max_redirects']} redirects")
@@ -94,8 +90,10 @@ def _challenged(resp) -> bool:
 def _allowlist_header(url: str, lc: dict) -> dict:
     """The header OpenText's WAF lets through, sent only to its own hosts so the token never leaks elsewhere."""
     name, token = lc.get("allowlist_header"), os.environ.get(TOKEN_ENV)
-    host = urlparse(url).hostname or ""
-    if name and token and any(host == h or host.endswith("." + h) for h in lc.get("allowlist_hosts", [])):
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    # https only: over plain http anyone on the network could read the token
+    if name and token and parsed.scheme == "https" and any(host == h or host.endswith("." + h) for h in lc.get("allowlist_hosts", [])):
         return {name: token}
     return {}
 

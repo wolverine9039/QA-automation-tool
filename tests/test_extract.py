@@ -73,3 +73,33 @@ async def test_infinite_scroll_page_still_finishes(server):
         page = await browser.new_page()
         await asyncio.wait_for(load_page(page, server + "/fixtures/infinite_scroll.html", CFG), timeout=40)
         await browser.close()
+
+
+async def test_extract_embeds_reads_src_and_data_src(server):
+    from engine.extract.links import extract_embeds
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await load_page(page, server + "/fixtures/embeds_page.html", CFG)
+        embeds = await extract_embeds(page)
+        await browser.close()
+    by_src = {e.raw_href: e for e in embeds}
+    assert set(by_src) == {"https://community.opentext.com/promo",
+                           "https://opentext.hubs.vidyard.com/watch/abc123?autoplay=1",
+                           "//play.vidyard.com/xyz", "/ok"}          # the iframe with no src is skipped
+    assert by_src["https://community.opentext.com/promo"].region == "header"
+    legacy = by_src["https://opentext.hubs.vidyard.com/watch/abc123?autoplay=1"]
+    assert (legacy.kind, legacy.region, legacy.text, legacy.selector) == ("embed", "main", "iframe: Product demo", "#legacy-player")
+    assert by_src["/ok"].abs_url == server + "/ok" and by_src["/ok"].text == "source"
+
+
+async def test_svg_link_gets_a_real_url(server):
+    """In <svg>, a.href is an object; the link must still be resolved and checked."""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto(server + "/ok")
+        await page.set_content('<main><svg><a href="/missing"><text y="20">Logo</text></a></svg></main>')
+        links = await extract_links(page, CFG)
+        await browser.close()
+    assert (links[0].abs_url, links[0].kind) == (server + "/missing", "internal")

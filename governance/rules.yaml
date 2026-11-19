@@ -22,6 +22,14 @@ link_check:
   # and set its secret VALUE in the QA_TOOL_ALLOWLIST_TOKEN environment variable (never in this file).
   allowlist_header: ""          # e.g. X-OT-QA-Tool
   allowlist_hosts: [opentext.com]   # the header is only sent to these hosts and their subdomains
+  # Legacy Vidyard video URLs (links and embeds). A match on "pattern" gets "replacement" as the suggestion;
+  # any other URL on an "other_hosts" host (or its subdomains) is flagged without a suggestion.
+  legacy_video:
+    pattern: 'https?://opentext\.hubs\.vidyard\.com/watch/([^?#/]+)'
+    replacement: 'https://videos.opentext.com/watch/\1'
+    other_hosts: [vidyard.com]
+  # Links and embeds containing any of these (case-insensitive) must be reviewed or replaced.
+  restricted_references: [community.opentext.com, microfocus, solutions/aviator]
 
 # Severity (critical | major | minor | info) and status (issue = must fix, review = check by hand) per rule.
 rules:
@@ -30,4 +38,7 @@ rules:
   L03: {name: Permanent redirect, severity: minor, status: issue}
   L04: {name: Temporary redirect, severity: info, status: issue}
   L05: {name: Redirect chain, severity: major, status: issue}
+  L06: {name: Legacy video URL, severity: major, status: issue}
+  L07: {name: Restricted reference, severity: major, status: review}
+  L08: {name: Absolute internal URL, severity: minor, status: issue}
   L09: {name: Empty link, severity: major, status: issue}

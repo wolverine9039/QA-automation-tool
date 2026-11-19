@@ -3,6 +3,8 @@
     "frontend-design@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
-    "ponytail@ponytail": true
+    "ponytail@ponytail": true,
+    "remember@claude-plugins-official": true,
+    "claude-mem@thedotmack": true
   }
 }

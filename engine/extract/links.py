@@ -1,8 +1,8 @@
-"""Layer 1: collect every <a href> on the rendered page, including links in hidden tabs."""
+"""Layer 1: collect every <a href> (including links in hidden tabs) and every embed source on the rendered page."""
 from engine.links.classify import classify_link
 from engine.models import LinkRecord
 
-_EXTRACT_JS = r"""() => {
+_HELPERS_JS = r"""
   const cssPath = el => {
     if (el.id) return '#' + CSS.escape(el.id);
     const parts = [];
@@ -22,24 +22,47 @@ _EXTRACT_JS = r"""() => {
   const region = a => (a.closest('[role=banner]') || isGlobal(a, 'header')) ? 'header'
                     : (a.closest('[role=contentinfo]') || isGlobal(a, 'footer')) ? 'footer' : 'main';
   const clean = s => (s || '').replace(/\s+/g, ' ').trim();
-  return [...document.querySelectorAll('a[href]')].map(a => {
-    const img = a.querySelector('img[alt]');
-    const rects = a.getClientRects();
-    const r = a.getBoundingClientRect();
+  // not el.href: on an <a> inside <svg> that is an object, not the URL
+  const absUrl = raw => { try { return new URL(raw, document.baseURI).href; } catch (e) { return raw; } };
+  const where = el => {
+    const rects = el.getClientRects();
+    const r = el.getBoundingClientRect();
     return {
-      raw_href: a.getAttribute('href'),
-      abs_url: a.href,
-      text: clean(a.innerText) || clean(a.textContent) || clean(a.getAttribute('aria-label'))
-            || clean(img && img.getAttribute('alt')),
-      target: a.getAttribute('target') || '',
-      rel: a.getAttribute('rel') || '',
-      role: a.getAttribute('role') || '',
-      region: region(a),
+      region: region(el),
       visible: rects.length > 0,
-      selector: cssPath(a),
+      selector: cssPath(el),
       bbox: rects.length ? {x: r.left + window.scrollX, y: r.top + window.scrollY,
                             width: r.width, height: r.height} : null,
     };
+  };
+"""
+
+_EXTRACT_JS = "() => {" + _HELPERS_JS + r"""
+  return [...document.querySelectorAll('a[href]')].map(a => {
+    const img = a.querySelector('img[alt]');
+    return {
+      raw_href: a.getAttribute('href'),
+      abs_url: absUrl(a.getAttribute('href')),
+      text: clean(a.innerText) || clean(a.textContent) || clean(a.getAttribute('aria-label'))
+            || clean(img && img.getAttribute('alt')),
+      target: a.getAttribute('target') || '',
+      role: a.getAttribute('role') || '',
+      ...where(a),
+    };
+  });
+}"""
+
+# Media and embedded players: Vidyard and other third-party content usually arrive this way, not as links.
+_EMBEDS_JS = "() => {" + _HELPERS_JS + r"""
+  // No script[src]: <head> and template scripts (e.g. Vidyard's player) are not page content.
+  const sel = 'iframe, video, source, audio, embed[src], object[data]';
+  return [...document.querySelectorAll(sel)].flatMap(el => {
+    const tag = el.tagName.toLowerCase();
+    const raw = tag === 'object' ? el.getAttribute('data') : (el.getAttribute('src') || el.getAttribute('data-src'));
+    if (!raw || !raw.trim()) return [];
+    const title = clean(el.getAttribute('title'));
+    return [{raw_href: raw, abs_url: absUrl(raw), text: title ? tag + ': ' + title : tag,
+             target: '', role: '', ...where(el)}];
   });
 }"""
 
@@ -49,3 +72,7 @@ async def extract_links(page, cfg: dict) -> list[LinkRecord]:
     for link in links:
         link.kind = classify_link(link.raw_href, link.abs_url, cfg)
     return links
+
+
+async def extract_embeds(page) -> list[LinkRecord]:
+    return [LinkRecord(**row, kind="embed") for row in await page.evaluate(_EMBEDS_JS)]

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}QA report{% if ticket_id %} - {{ ticket_id }}{% endif %}{% endblock %}
+{% block title %}QA report{% endblock %}
 {% block content %}
 <section class="card">
   <div class="report-head">
     <div>
-      <h1>Link QA report{% if ticket_id %} &middot; {{ ticket_id }}{% endif %}</h1>
+      <h1>Link QA report</h1>
       <p class="muted"><a href="{{ r.final_url }}" target="_blank" rel="noopener">{{ r.final_url }}</a>
         &middot; page HTTP {{ r.page_status }} &middot; {{ r.duration_s }}s &middot; {{ r.started_at|local_time }}
         &middot; scope: {{ "whole page" if r.include_global else "page content (header & footer excluded)" }}</p>
@@ -25,14 +25,14 @@
     <div class="counter"><b>{{ inv.other }}</b>Other<small>mailto, tel, anchors, empty</small></div>
     <div class="counter bad"><b>{{ inv.broken }}</b>Broken{% if inv.unverifiable %}<small>{{ inv.unverifiable }} still to check</small>{% endif %}</div>
     <div class="counter warn"><b>{{ inv.redirected }}</b>Redirected</div>
+    <div class="counter warn"><b>{{ inv.legacy or 0 }}</b>Legacy<small>old Vidyard, restricted refs</small></div>
     <div class="counter info"><b>{{ inv.unverifiable }}</b>Still to check by hand</div>
   </div>
 </section>
 
 {% if review_rows %}
 <section class="card review" id="review">
-  {% set left = r.inventory.unverifiable %}
-  <h2>{% if left %}{{ left }} link{{ "s" if left != 1 }} need a human check{% else %}Human check done{% endif %}</h2>
+  <h2>{% if left %}{{ left }} link{{ "s need" if left != 1 else " needs" }} a human check{% else %}Human check done{% endif %}</h2>
   <p class="muted">These sites block automated checks (bot protection), so the tool cannot tell if they work.
     Open each one, then mark it. The counts and exports update straight away.</p>
   <div class="table-wrap"><table class="compact">
@@ -104,7 +104,7 @@
           {% elif res.outcome == "ok" and res.chain %}<span class="outcome redirected">redirect</span>
           {% else %}<span class="outcome {{ res.outcome }}">{{ "check manually" if res.outcome == "unverifiable" else res.outcome }}</span>{% endif %}
         </td>
-        <td>{{ res.status if res and res.status else "" }}</td>
+        <td>{{ res|http_status }}</td>
         <td>{{ l.kind }}</td>
         <td>{{ l.text or "(no text)" }}</td>
         <td class="url">{{ l.raw_href or "(empty)" }}</td>

@@ -39,7 +39,7 @@ def _from_result(link: LinkRecord, res: CheckResult, cfg: dict) -> Finding | Non
     hops = len(res.chain)
     if hops == 0:
         return None
-    target = _suggested_target(link, res)  # the suggestion is the replacement URL itself, ready to paste
+    target = _suggested_target(link, res, cfg)  # the suggestion is the replacement URL itself, ready to paste
     path = " -> ".join([h[0] for h in res.chain] + [res.final_url])
     if hops > 1:
         return _finding("L05", link, cfg, "Redirect", f"Redirect chain ({hops} hops): {path}",
@@ -52,15 +52,21 @@ def _from_result(link: LinkRecord, res: CheckResult, cfg: dict) -> Finding | Non
                     target, res)
 
 
-def _suggested_target(link: LinkRecord, res: CheckResult) -> str:
-    """Keep relative links relative (authoring standard), unless the redirect leaves this host."""
+def _suggested_target(link: LinkRecord, res: CheckResult, cfg: dict) -> str:
+    """Relative when the destination is internal (authoring standard, see L08); absolute when it leaves the site."""
     authored = urlparse(link.raw_href)
     final = urlparse(res.final_url)
     fragment = f"#{authored.fragment}" if authored.fragment and not final.fragment else ""
     same_host = final.netloc == urlparse(link.abs_url).netloc
-    if same_host and not authored.scheme and not authored.netloc:
-        return final.path + (f"?{final.query}" if final.query else "") + fragment
+    internal = (final.hostname or "") in cfg["link_check"]["internal_hosts"]
+    if internal or (same_host and not authored.scheme and not authored.netloc):
+        return relative(final) + fragment
     return res.final_url + fragment
+
+
+def relative(u) -> str:
+    """The path form of a parsed URL; a bare host ("https://www.opentext.com") is "/", never ""."""
+    return (u.path or "/") + (f"?{u.query}" if u.query else "") + (f"#{u.fragment}" if u.fragment else "")
 
 
 def _finding(rule_id, link, cfg, category, message, suggestion, res: CheckResult | None = None) -> Finding:
@@ -69,5 +75,5 @@ def _finding(rule_id, link, cfg, category, message, suggestion, res: CheckResult
         rule_id=rule_id, category=category, severity=rule["severity"], status=rule["status"],
         message=message, suggestion=suggestion, element_text=link.text, raw_value=link.raw_href,
         url=link.abs_url, selector=link.selector, region=link.region, bbox=link.bbox,
-        http_status=res.status if res else None, chain=res.chain if res else [],
+        chain=res.chain if res else [],
     )

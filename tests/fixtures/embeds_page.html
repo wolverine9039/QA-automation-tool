@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head><title>Embeds</title><script src="/missing.js"></script></head>
+<body>
+  <header>
+    <iframe title="Header promo" data-src="https://community.opentext.com/promo"></iframe>
+  </header>
+  <section>
+    <h1>Video page</h1>
+    <!-- data-src (lazy-load attribute) so the browser never fetches these during tests -->
+    <iframe id="legacy-player" title="Product demo" data-src="https://opentext.hubs.vidyard.com/watch/abc123?autoplay=1"></iframe>
+    <iframe id="other-vidyard" data-src="//play.vidyard.com/xyz"></iframe>
+    <iframe id="no-src"></iframe>
+    <video preload="none"><source id="local-video" src="/ok" type="video/mp4"></video>
+    <a id="restricted" href="/ok?ref=MicroFocus">Partner page</a>
+  </section>
+</body>
+</html>

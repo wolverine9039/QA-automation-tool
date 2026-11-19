@@ -70,3 +70,16 @@ async def test_challenge_page_warns(server, test_cfg):
 async def test_page_redirect_warns(server, test_cfg):
     result = await run(server + "/r301", cfg=test_cfg)
     assert any("redirected to" in w and w.rstrip(".").endswith("/ok") for w in result.warnings)
+
+
+async def test_run_flags_legacy_and_restricted_embeds(server, test_cfg):
+    result = await run(server + "/fixtures/embeds_page.html", cfg=test_cfg)
+    ids = Counter(f.rule_id for f in result.findings)
+    assert ids == {"L06": 2, "L07": 1}        # header iframe excluded by the default main-only scope
+    l06 = next(f for f in result.findings if f.raw_value.startswith("https://opentext.hubs"))
+    assert l06.suggestion == "https://videos.opentext.com/watch/abc123"
+    assert result.inventory["legacy"] == 3     # 2 Vidyard embeds + the MicroFocus link
+    assert {e.region for e in result.embeds} == {"main"}
+
+    everything = await run(server + "/fixtures/embeds_page.html", include_global=True, cfg=test_cfg)
+    assert Counter(f.rule_id for f in everything.findings)["L07"] == 2

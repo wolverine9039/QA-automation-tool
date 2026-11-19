@@ -44,6 +44,10 @@ class Handler(BaseHTTPRequestHandler):
         if path in STATUSES:
             return self._send(STATUSES[path], b"<html><body>status page</body></html>",
                               {"Content-Type": "text/html"})
+        if path == "/cookie-check":  # redirects to itself once to set a cookie, like some WAFs
+            if "seen=1" in (self.headers.get("Cookie") or ""):
+                return self._send(200, b"ok")
+            return self._send(302, headers={"Location": path, "Set-Cookie": "seen=1; Path=/"})
         if path == "/slow":
             time.sleep(3)
             return self._send(200, b"slow")

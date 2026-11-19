@@ -12,7 +12,7 @@ def summarize(links: list[LinkRecord], results: dict[str, CheckResult]) -> dict:
         res = results.get(check_key(l.abs_url)) if l.kind in CHECKABLE else None
         if res:
             outcomes[res.outcome] += 1
-            outcomes["redirected"] += bool(res.chain)
+            outcomes["redirected"] += res.outcome == "ok" and bool(res.chain)
     return {
         "total": len(links),
         "internal": kinds["internal"],

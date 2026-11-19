@@ -1,6 +1,10 @@
 """Dashboard: enter a page URL, run the link check, read and export the report."""
 import asyncio
+import ipaddress
+import os
+import socket
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -13,17 +17,49 @@ from playwright.async_api import Error as PlaywrightError
 from engine.links.classify import CHECKABLE, check_key
 from engine.config import load_config
 from engine.runner import apply_review, run_sync
-from report.export import findings_csv, links_csv, local_time
+from report.export import findings_csv, links_csv, local_time, shown_status
 
 HERE = Path(__file__).parent
-app = FastAPI(title="OpenText QA Tool")
+app = FastAPI(title="OpenText QA Tool", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["local_time"] = local_time
+templates.env.filters["http_status"] = shown_status
 
 # shortcut: runs live in memory and vanish on restart; move to data/runs.sqlite with the history slice.
 RUNS: dict[str, dict] = {}
 MAX_RUNS = 50
+
+# Set on the public Cloud Run deploy: block internal addresses and cap daily runs. Off for local use and tests.
+PUBLIC = os.environ.get("QA_TOOL_PUBLIC") == "1"
+DAILY_RUN_LIMIT = 200
+# shortcut: in-memory count resets when the instance restarts (exact only with max-instances 1); persist with history.
+DAILY_RUNS = {"date": "", "count": 0}
+# Each run starts its own Chromium (several hundred MB); more runs wait instead of exhausting memory.
+RUN_SLOTS = asyncio.Semaphore(2)
+
+
+def _is_public_host(host: str) -> bool:
+    """False if the host is or resolves to a loopback, private, link-local (cloud metadata) or other non-public address."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError):
+        return True  # unresolvable: let the browser report it as "could not open"
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if not (getattr(ip, "ipv4_mapped", None) or ip).is_global:
+            return False
+    return True
+
+
+def _take_daily_run() -> bool:
+    today = datetime.now(timezone.utc).date().isoformat()
+    if DAILY_RUNS["date"] != today:
+        DAILY_RUNS.update(date=today, count=0)
+    if DAILY_RUNS["count"] >= DAILY_RUN_LIMIT:
+        return False
+    DAILY_RUNS["count"] += 1
+    return True
 
 
 @app.get("/")
@@ -32,22 +68,31 @@ def index(request: Request):
 
 
 @app.post("/run")
-async def start_run(request: Request, url: str = Form(...), ticket_id: str = Form(""),
-                    include_global: bool = Form(False)):
+async def start_run(request: Request, url: str = Form(...), include_global: bool = Form(False)):
     url = url.strip()
-    form = {"url": url, "ticket_id": ticket_id, "include_global": include_global}
+    form = {"url": url, "include_global": include_global}
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return templates.TemplateResponse(request, "index.html", {
             "error": "Enter a full page address starting with http:// or https://", **form}, status_code=400)
+    if PUBLIC and not await asyncio.to_thread(_is_public_host, parsed.hostname or ""):
+        return templates.TemplateResponse(request, "index.html", {
+            "error": "Only public web pages can be checked.", **form}, status_code=400)
+    if PUBLIC and not _take_daily_run():
+        return templates.TemplateResponse(request, "index.html", {
+            "error": f"The daily limit of {DAILY_RUN_LIMIT} checks has been reached. Please try again tomorrow.",
+            **form}, status_code=429)
     try:
         # Worker thread + fresh loop: Playwright needs a subprocess-capable loop, whatever loop uvicorn runs.
-        result = await asyncio.to_thread(run_sync, url, include_global)
+        async with RUN_SLOTS:
+            result = await asyncio.to_thread(run_sync, url, include_global)
     except PlaywrightError as e:
         return templates.TemplateResponse(request, "index.html", {
             "error": f"Could not open the page: {str(e).splitlines()[0]}", **form}, status_code=502)
+    except ValueError as e:  # a mistake in governance/rules.yaml
+        return templates.TemplateResponse(request, "index.html", {"error": str(e), **form}, status_code=500)
     run_id = uuid.uuid4().hex[:12]
-    RUNS[run_id] = {"ticket_id": ticket_id.strip(), "result": result}
+    RUNS[run_id] = {"result": result}
     while len(RUNS) > MAX_RUNS:
         RUNS.pop(next(iter(RUNS)))
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
@@ -60,7 +105,7 @@ def _get(run_id: str) -> dict:
 
 
 @app.get("/runs/{run_id}")
-def report(request: Request, run_id: str):
+async def report(request: Request, run_id: str):
     entry = _get(run_id)
     result = entry["result"]
     link_rows = [(l, result.results.get(check_key(l.abs_url)) if l.kind in CHECKABLE else None)
@@ -71,12 +116,14 @@ def report(request: Request, run_id: str):
         if res and (res.outcome == "unverifiable" or res.checked_by == "reviewer"):
             review_rows.setdefault(res.url, (l.text, res))
     return templates.TemplateResponse(request, "report.html", {
-        "run_id": run_id, "ticket_id": entry["ticket_id"], "r": result, "link_rows": link_rows,
-        "review_rows": review_rows})
+        "run_id": run_id, "r": result, "link_rows": link_rows,
+        "review_rows": review_rows,
+        # per URL, like the table; the counters count every time a link appears
+        "left": sum(res.outcome == "unverifiable" for _, res in review_rows.values())})
 
 
 @app.post("/runs/{run_id}/review")
-def review(run_id: str, url: str = Form(...), verdict: str = Form(...)):
+async def review(run_id: str, url: str = Form(...), verdict: str = Form(...)):
     entry = _get(run_id)
     try:
         apply_review(entry["result"], url, verdict, load_config())
@@ -92,12 +139,12 @@ def _csv_response(text: str, name: str) -> Response:
 
 
 @app.get("/runs/{run_id}/findings.csv")
-def findings_download(run_id: str):
+async def findings_download(run_id: str):
     entry = _get(run_id)
-    return _csv_response(findings_csv(entry["result"], entry["ticket_id"]), f"QA_Findings_{entry['ticket_id'] or run_id}")
+    return _csv_response(findings_csv(entry["result"]), f"QA_Findings_{run_id}")
 
 
 @app.get("/runs/{run_id}/links.csv")
-def links_download(run_id: str):
+async def links_download(run_id: str):
     entry = _get(run_id)
-    return _csv_response(links_csv(entry["result"], entry["ticket_id"]), f"QA_Links_{entry['ticket_id'] or run_id}")
+    return _csv_response(links_csv(entry["result"]), f"QA_Links_{run_id}")
