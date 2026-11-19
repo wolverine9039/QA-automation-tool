@@ -81,6 +81,10 @@ Two checks run at a time and others wait. `--max-instances 1` is required becaus
 
 Logs: `gcloud run services logs read qa-tool --region us-central1 --project <project-id>`
 
+### Custom domain and static IP
+
+`deploy\cloudrun\setup_domain.ps1 -Project <project-id>` (run once after `deploy.ps1`, safe to re-run) reserves a static IP and puts an HTTPS load balancer in front of the service for `qa-tool.buildwithmayank.tech`, which is proxied by Cloudflare. It prints the two Cloudflare DNS records to add: an `A` record to the IP (Proxied) and an `_acme-challenge` `CNAME` (DNS only) that lets Google issue the certificate. Set Cloudflare SSL/TLS to **Full (strict)**. After this the `run.app` URL stops answering: Cloud Run only accepts traffic from the load balancer. If Cloud Armor quota is available, the script also limits the load balancer to Cloudflare's IPs; on projects with a quota of 0 it skips that step with a warning.
+
 ## Develop
 
 ```
