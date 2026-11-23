@@ -1,7 +1,7 @@
 # Put the Cloud Run service behind a static IP and a custom domain proxied by Cloudflare. Safe to re-run.
 #   powershell -ExecutionPolicy Bypass -File deploy\cloudrun\setup_domain.ps1 -Project <project-id>
 # Builds: reserved global IP -> HTTPS load balancer (Google-managed cert via DNS authorization, which works while
-# Cloudflare proxies the name) -> Cloud Armor (only Cloudflare IPs) -> serverless NEG -> Cloud Run (LB-only ingress).
+# Cloudflare proxies the name) -> Cloud Armor (only Cloudflare IPs) -> serverless NEG -> Cloud Run.
 # Run deploy.ps1 first. Prints the two DNS records to add in Cloudflare.
 param(
     [Parameter(Mandatory = $true)][string]$Project,
@@ -96,9 +96,7 @@ Ensure "forwarding rule" @("compute", "forwarding-rules", "describe", $rule, "--
     @("compute", "forwarding-rules", "create", $rule, "--global", "--load-balancing-scheme", "EXTERNAL_MANAGED",
       "--address", $ip, "--target-https-proxy", $proxy, "--ports", "443")
 
-Step "Cloud Run accepts traffic only from the load balancer (the run.app URL stops answering)"
-& $gcloud run services update $Service --region $Region --project $Project --ingress internal-and-cloud-load-balancing --quiet
-Check "Setting ingress"
+# Cloud Run ingress stays "all": the client URL (deploy\firebase\setup_hosting.ps1) reaches it from outside the LB.
 
 $addr = (& $gcloud compute addresses describe $ip --global --project $Project --format "value(address)").Trim()
 $cname = & $gcloud certificate-manager dns-authorizations describe $dnsauth --project $Project --format "value(dnsResourceRecord.name,dnsResourceRecord.data)"

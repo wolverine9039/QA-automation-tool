@@ -83,7 +83,13 @@ Logs: `gcloud run services logs read qa-tool --region us-central1 --project <pro
 
 ### Custom domain and static IP
 
-`deploy\cloudrun\setup_domain.ps1 -Project <project-id>` (run once after `deploy.ps1`, safe to re-run) reserves a static IP and puts an HTTPS load balancer in front of the service for `qa-tool.buildwithmayank.tech`, which is proxied by Cloudflare. It prints the two Cloudflare DNS records to add: an `A` record to the IP (Proxied) and an `_acme-challenge` `CNAME` (DNS only) that lets Google issue the certificate. Set Cloudflare SSL/TLS to **Full (strict)**. After this the `run.app` URL stops answering: Cloud Run only accepts traffic from the load balancer. If Cloud Armor quota is available, the script also limits the load balancer to Cloudflare's IPs; on projects with a quota of 0 it skips that step with a warning.
+`deploy\cloudrun\setup_domain.ps1 -Project <project-id>` (run once after `deploy.ps1`, safe to re-run) reserves a static IP and puts an HTTPS load balancer in front of the service for `qa-tool.buildwithmayank.tech`, which is proxied by Cloudflare. It prints the two Cloudflare DNS records to add: an `A` record to the IP (Proxied) and an `_acme-challenge` `CNAME` (DNS only) that lets Google issue the certificate. Set Cloudflare SSL/TLS to **Full (strict)**. This domain is for internal use; give the client the Firebase URL below. If Cloud Armor quota is available, the script also limits the load balancer to Cloudflare's IPs; on projects with a quota of 0 it skips that step with a warning.
+
+### Client URL (Firebase Hosting)
+
+The client gets **https://opentext-qa-tool.web.app**, a neutral address with no personal domain. `deploy\firebase\setup_hosting.ps1 -Project <project-id>` (safe to re-run) adds Firebase to the project, creates the Hosting site and sends every path to the Cloud Run service; it also sets Cloud Run ingress to `all`, which Firebase needs. The first time, someone who owns the project must click "Add Firebase" once in the Firebase console to accept Firebase's terms.
+
+Firebase stops waiting for Cloud Run after **60 seconds** per request. A typical check takes about 20 seconds; a page with many slow links could hit the limit and show a 504.
 
 ## Develop
 
